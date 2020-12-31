@@ -1,26 +1,23 @@
 package com.example.mytask2;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.Manifest;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
+import android.provider.OpenableColumns;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import androidx.appcompat.app.AppCompatActivity;
+
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 
@@ -29,6 +26,15 @@ public class MainActivity extends AppCompatActivity {
     private  static final int PER_REQ_STORAGE = 1000;
     private  static final int READ_REQ_CODE = 42;
     private static final String TAG = "Base64String:";
+    private String[] mimeTypes =
+            {
+                    "application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "text/plain",
+                    "application/pdf",
+                    "application/zip"
+            };
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -37,20 +43,22 @@ public class MainActivity extends AppCompatActivity {
         selectFile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
+                if(checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
                 {
                     requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE},PER_REQ_STORAGE);
                 }
                 try {
                     Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                     it.addCategory(Intent.CATEGORY_OPENABLE);
-                    it.setType("*/*");
-                    startActivityForResult(it,READ_REQ_CODE);
-                    //it.setType("*/*")
-                    // Intent i = Intent.createChooser(it, "Select File");
-                    // startActivityForResult(Intent.getIntent(Intent.ACTION_GET_CONTENT), FILE_SELECT_CODE);
-                } catch (android.content.ActivityNotFoundException ex) {
-                    Toast.makeText(getApplicationContext(), "Please install File Manager", Toast.LENGTH_SHORT).show();
+                    it.setType(mimeTypes.length == 1 ? mimeTypes[0] : "*/*");
+                    if(mimeTypes.length > 0){
+                        it.putExtra(Intent.EXTRA_MIME_TYPES,mimeTypes);
+                    }
+                    startActivityForResult(Intent.createChooser(it,"Choose File"),READ_REQ_CODE);
+//                  it.setType("*/*");
+//                  startActivityForResult(it,READ_REQ_CODE);
+                }catch (ActivityNotFoundException ex) {
+                    Toast.makeText(getApplicationContext(), "Please install File Manager" + ex ,Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -63,6 +71,19 @@ public class MainActivity extends AppCompatActivity {
             if(Data != null)
             {
                 Uri uri=Data.getData();
+                Cursor returnC = getContentResolver().query(uri,null,null,null,null);
+                String mime = getContentResolver().getType(uri);
+
+                int nameIndex = returnC.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                int sizeIndex = returnC.getColumnIndex(OpenableColumns.SIZE);
+                returnC.moveToFirst();
+                //String name = returnC.getString(nameIndex);
+                Long size = Long.valueOf(Long.toString(returnC.getLong(sizeIndex)));
+                if(size > 256000){
+                    Toast.makeText(this,"Please select file size upto 256kb",Toast.LENGTH_LONG).show();
+                    return;
+                }
+                //Toast.makeText(this,name + size , Toast.LENGTH_LONG).show();
                 String path= uri.getPath();
                 path = path.substring(path.indexOf(":")+1);
                 String encodedString = null;
@@ -72,7 +93,8 @@ public class MainActivity extends AppCompatActivity {
                     encodedString = new String(encodedBytes);
                     //byte[] decodedBytes = Base64.getDecoder().decode(encodedString.getBytes());
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "onActivityResult: ", e);
+                    Toast.makeText(this, (CharSequence) e,Toast.LENGTH_LONG).show();
                 }
                 //Toast.makeText(this,""+path,Toast.LENGTH_LONG).show();
                 Log.d(TAG, encodedString);
@@ -88,10 +110,10 @@ public class MainActivity extends AppCompatActivity {
         {
             if(grantResults[0] ==  PackageManager.PERMISSION_GRANTED)
             {
-                Toast.makeText(this,"Permission granted",Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,"PERMISSION GRANTED",Toast.LENGTH_LONG).show();
             }else
             {
-                Toast.makeText(this,"Permission denied",Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,"PERMISSION DENIED ",Toast.LENGTH_LONG).show();
                 finish();
             }
         }
