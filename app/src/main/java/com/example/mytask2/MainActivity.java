@@ -8,6 +8,8 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.util.Log;
 import android.view.View;
@@ -33,7 +35,9 @@ public class MainActivity extends AppCompatActivity {
                     "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     "text/plain",
                     "application/pdf",
-                    "application/zip"
+                    //"application/zip",
+                    //"image/jpeg",
+                    //"*/*",
             };
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,8 +52,9 @@ public class MainActivity extends AppCompatActivity {
                     requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE},PER_REQ_STORAGE);
                 }
                 try {
-                    Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                    it.addCategory(Intent.CATEGORY_OPENABLE);
+                    //Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    //it.addCategory(Intent.CATEGORY_OPENABLE);
+                    Intent it = new Intent(Intent.ACTION_GET_CONTENT);
                     it.setType(mimeTypes.length == 1 ? mimeTypes[0] : "*/*");
                     if(mimeTypes.length > 0){
                         it.putExtra(Intent.EXTRA_MIME_TYPES,mimeTypes);
@@ -72,21 +77,40 @@ public class MainActivity extends AppCompatActivity {
             {
                 Uri uri=Data.getData();
                 Cursor returnC = getContentResolver().query(uri,null,null,null,null);
-                String mime = getContentResolver().getType(uri);
 
-                int nameIndex = returnC.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+//                String mime = getContentResolver().getType(uri);
+//                int nameIndex = returnC.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+//                String name = returnC.getString(nameIndex);
+//                Toast.makeText(this,name + size , Toast.LENGTH_LONG).show();
+//                String filePath = returnC.getString(0);
+//                List<String> list = uri.getPathSegments();
+//                String pathType = list.get(1);
+//                final String[] split1 = pathType.split(":");
+//                final String type1 = split1[0];
+
                 int sizeIndex = returnC.getColumnIndex(OpenableColumns.SIZE);
                 returnC.moveToFirst();
-                //String name = returnC.getString(nameIndex);
                 Long size = Long.valueOf(Long.toString(returnC.getLong(sizeIndex)));
-                if(size > 256000){
-                    Toast.makeText(this,"Please select file size upto 256kb",Toast.LENGTH_LONG).show();
+                if(size > 512000){
+                    Toast.makeText(this,"Please select file size upto 512kb",Toast.LENGTH_LONG).show();
                     return;
                 }
-                //Toast.makeText(this,name + size , Toast.LENGTH_LONG).show();
-                String path= uri.getPath();
-                path = path.substring(path.indexOf(":")+1);
+                final String docId = DocumentsContract.getDocumentId(uri);
+                final String[] split = docId.split(":");
+                final String type = split[0];
+                String path = null;
                 String encodedString = null;
+                switch (type){
+                    case "primary" :
+                        type.equalsIgnoreCase(type);
+                        path = Environment.getExternalStorageDirectory() + "/" + split[1];
+                        break;
+                    case "raw" :
+                        type.equalsIgnoreCase(type);
+                        path= uri.getPath();
+                        path = path.substring(path.indexOf(":")+1);
+                        break;
+                }
                 try {
                     byte[] input_file = Files.readAllBytes(Paths.get(path));
                     byte[] encodedBytes = Base64.getEncoder().encode(input_file);
@@ -96,9 +120,11 @@ public class MainActivity extends AppCompatActivity {
                     Log.e(TAG, "onActivityResult: ", e);
                     Toast.makeText(this, (CharSequence) e,Toast.LENGTH_LONG).show();
                 }
-                //Toast.makeText(this,""+path,Toast.LENGTH_LONG).show();
                 Log.d(TAG, encodedString);
                 Toast.makeText(this,encodedString,Toast.LENGTH_LONG).show();
+
+                //Toast.makeText(this,""+path,Toast.LENGTH_LONG).show();
+
             }
         }
         super.onActivityResult(requestCode, resultCode, Data);
